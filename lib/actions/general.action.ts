@@ -11,11 +11,11 @@ export async function createFeedback(params: CreateFeedbackParams) {
 
   try {
     const formattedTranscript = transcript
-      .map(
-        (sentence: { role: string; content: string }) =>
-          `- ${sentence.role}: ${sentence.content}\n`
-      )
-      .join("");
+        .map(
+            (sentence: { role: string; content: string }) =>
+                `- ${sentence.role}: ${sentence.content}\n`
+        )
+        .join("");
 
     const { object } = await generateObject({
       model: google("gemini-2.0-flash-001", {
@@ -35,7 +35,7 @@ export async function createFeedback(params: CreateFeedbackParams) {
         - **Confidence & Clarity**: Confidence in responses, engagement, and clarity.
         `,
       system:
-        "You are a professional interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories",
+          "You are a professional interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories",
     });
 
     const feedback = {
@@ -72,16 +72,16 @@ export async function getInterviewById(id: string): Promise<Interview | null> {
 }
 
 export async function getFeedbackByInterviewId(
-  params: GetFeedbackByInterviewIdParams
+    params: GetFeedbackByInterviewIdParams
 ): Promise<Feedback | null> {
   const { interviewId, userId } = params;
 
   const querySnapshot = await db
-    .collection("feedback")
-    .where("interviewId", "==", interviewId)
-    .where("userId", "==", userId)
-    .limit(1)
-    .get();
+      .collection("feedback")
+      .where("interviewId", "==", interviewId)
+      .where("userId", "==", userId)
+      .limit(1)
+      .get();
 
   if (querySnapshot.empty) return null;
 
@@ -90,32 +90,36 @@ export async function getFeedbackByInterviewId(
 }
 
 export async function getLatestInterviews(
-  params: GetLatestInterviewsParams
+    params: GetLatestInterviewsParams
 ): Promise<Interview[] | null> {
   const { userId, limit = 20 } = params;
 
+  // Firestore does not reliably support != combined with orderBy on a different
+  // field — it requires a complex composite index and still fails in many SDK
+  // versions. The clean solution: fetch all finalized interviews ordered by
+  // createdAt (simple 2-field index: finalized ASC + createdAt DESC), then
+  // filter out the current user's own interviews in JavaScript.
   const interviews = await db
-    .collection("interviews")
-    .orderBy("createdAt", "desc")
-    .where("finalized", "==", true)
-    .where("userId", "!=", userId)
-    .limit(limit)
-    .get();
+      .collection("interviews")
+      .where("finalized", "==", true)
+      .orderBy("createdAt", "desc")
+      .limit(limit + 1) // fetch one extra so after filtering we still have enough
+      .get();
 
-  return interviews.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Interview[];
+  return interviews.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() } as Interview))
+      .filter((interview) => interview.userId !== userId)
+      .slice(0, limit);
 }
 
 export async function getInterviewsByUserId(
-  userId: string
+    userId: string
 ): Promise<Interview[] | null> {
   const interviews = await db
-    .collection("interviews")
-    .where("userId", "==", userId)
-    .orderBy("createdAt", "desc")
-    .get();
+      .collection("interviews")
+      .where("userId", "==", userId)
+      .orderBy("createdAt", "desc")
+      .get();
 
   return interviews.docs.map((doc) => ({
     id: doc.id,

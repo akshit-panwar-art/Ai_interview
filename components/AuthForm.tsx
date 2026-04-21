@@ -5,8 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
 import { auth } from "@/firebase/client";
-import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import {
@@ -24,7 +24,7 @@ const authFormSchema = (type: FormType) => {
   return z.object({
     name: type === "sign-up" ? z.string().min(3) : z.string().optional(),
     email: z.string().email(),
-    password: z.string().min(6),
+    password: z.string().min(3),
   });
 };
 
@@ -81,10 +81,21 @@ const AuthForm = ({ type }: { type: FormType }) => {
           return;
         }
 
-        await signIn({ email, idToken });
+        const result = await signIn({ email, idToken });
+
+        if (!result?.success) {
+          toast.error(result?.message);
+          return;
+        }
 
         toast.success("Signed in successfully.");
-        router.push("/");
+
+        // FIX: Use a hard navigation instead of router.push() + router.refresh().
+        // In Next.js 15, router.push() doesn't wait for the session cookie to be
+        // recognized by the server, so the root layout's isAuthenticated() check
+        // fails and redirects back to /sign-in. window.location.href forces a
+        // full browser request which correctly sends the new session cookie.
+        window.location.href = "/";
       }
     } catch (error) {
       console.log(error);
