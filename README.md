@@ -1,4 +1,4 @@
-# PrepWise — AI Mock Interview Platform
+# AI Mock Interview Platform
 
 An AI-powered mock interview platform built with Next.js, Firebase, Vapi, and Google Gemini.
 
